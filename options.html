@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>YouTube Filter Checkmark — Options</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; }
+      h1 { font-size: 18px; margin: 0 0 12px; }
+      .row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+      textarea { width: 100%; height: 240px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      button { padding: 8px 12px; }
+      .hint { color: #555; font-size: 12px; margin-top: 8px; }
+      .status { margin-left: auto; color: #0a0; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Hidden video IDs</h1>
+
+    <div class="row">
+      <button id="reload">Reload</button>
+      <button id="save">Save</button>
+      <button id="clear">Clear All</button>
+      <div class="status" id="status"></div>
+    </div>
+
+    <textarea id="ids" spellcheck="false"></textarea>
+
+    <div class="hint">
+      One video ID per line. This is primarily for recovery/debugging. Most users will just click the checkmark overlay on YouTube.
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

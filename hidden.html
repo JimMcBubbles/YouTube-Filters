@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hidden Videos</title>
+    <link rel="stylesheet" href="hidden.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="title">Hidden</div>
+
+      <div class="controls">
+        <label class="label" for="sort">Sort</label>
+        <select id="sort">
+          <option value="hidden_desc">Hidden date (newest)</option>
+          <option value="hidden_asc">Hidden date (oldest)</option>
+          <option value="posted_desc">Date posted (newest)</option>
+          <option value="posted_asc">Date posted (oldest)</option>
+        </select>
+
+        <button id="clearAll" class="danger">Clear all</button>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div id="empty" class="empty" hidden>
+        No hidden videos yet.
+      </div>
+
+      <div id="list" class="list"></div>
+    </main>
+
+    <script src="hidden.js"></script>
+  </body>
+</html>

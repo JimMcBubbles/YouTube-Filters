@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Filter (YF)",
+  "version": "1.0.0",
+  "description": "Hide videos with a checkbox, and manage hidden videos.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://www.youtube.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["hidden.html", "hidden.css", "hidden.js"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ]
+}
