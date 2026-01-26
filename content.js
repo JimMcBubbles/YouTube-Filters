@@ -1,3 +1,5 @@
+// Version: 2026-01-26
+// Update: 2026-01-26 - Align overlay button styling with YouTube theme tokens.
 (() => {
   "use strict";
 
@@ -395,34 +397,44 @@
 
     const style = document.createElement("style");
     style.textContent = `
-      button{
+      .yf-overlay-button{
         all:unset;
-        width:22px;height:22px;
-        border-radius:6px;
+        padding:5px;
+        border-radius:8px;
         box-sizing:border-box;
-        display:grid;place-items:center;
+        display:grid;
+        place-items:center;
         cursor:pointer;
-        background:rgba(0,0,0,.55);
-        border:1px solid rgba(255,255,255,.35);
-        backdrop-filter:blur(2px)
+        background:transparent;
+        color:var(--yt-spec-overlay-text-primary, #fff);
       }
-      button:hover{background:rgba(0,0,0,.70);border-color:rgba(255,255,255,.55)}
-      .mark{width:14px;height:14px;display:block}
-      .checked path{opacity:1}
-      .unchecked path{opacity:.25}
-      button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+      .yf-overlay-button:hover{
+        background:var(--yt-spec-overlay-tonal-hover, rgba(255,255,255,0.2));
+      }
+      .yf-overlay-button:focus-visible{
+        outline:2px solid var(--yt-spec-overlay-text-primary, #fff);
+        outline-offset:2px;
+      }
+      .yf-overlay-icon{
+        width:14px;
+        height:14px;
+        display:block;
+      }
+      .yf-overlay-icon path{fill:currentColor}
+      .checked .yf-overlay-icon path{opacity:1}
+      .unchecked .yf-overlay-icon path{opacity:.25}
     `;
 
     const btn = document.createElement("button");
     btn.type = "button";
+    btn.className = "yf-overlay-button";
 
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
-    svg.classList.add("mark");
+    svg.classList.add("yf-overlay-icon");
 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", "M9 16.2l-3.5-3.5L4 14.2l5 5 12-12-1.5-1.5z");
-    path.setAttribute("fill", "white");
 
     svg.appendChild(path);
     btn.appendChild(svg);
