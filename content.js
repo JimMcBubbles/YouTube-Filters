@@ -230,6 +230,39 @@
     return txt;
   }
 
+  const MAX_META_FIELD_LENGTH = 500;
+
+  function truncateValue(value, maxLen) {
+    if (typeof value !== "string") return "";
+    const trimmed = value.trim();
+    if (trimmed.length <= maxLen) return trimmed;
+    return trimmed.slice(0, maxLen);
+  }
+
+  function sanitizeThumbUrl(url) {
+    if (typeof url !== "string") return "";
+    const trimmed = url.trim();
+    if (!trimmed) return "";
+    if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return "";
+    if (!/^https?:\/\//i.test(trimmed)) return "";
+    return truncateValue(trimmed, 400);
+  }
+
+  function sanitizeMeta(meta) {
+    return {
+      title: truncateValue(meta.title, MAX_META_FIELD_LENGTH),
+      channel: truncateValue(meta.channel, MAX_META_FIELD_LENGTH),
+      postedText: truncateValue(meta.postedText, MAX_META_FIELD_LENGTH),
+      thumb: sanitizeThumbUrl(meta.thumb)
+    };
+  }
+
+  function isQuotaError(error) {
+    if (!error) return false;
+    const message = String(error.message || error);
+    return message.includes("Quota") || message.includes("kQuotaBytesPerItem");
+  }
+
   function extractMetaFromCard(card) {
     // title
     const titleEl =
@@ -663,7 +696,7 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
 
   async function updateMetaCache(id, card) {
     if (!id || !card) return;
-    const m = extractMetaFromCard(card);
+    const m = sanitizeMeta(extractMetaFromCard(card));
     const storageKey = metaStorageKey(id);
     let prev = metaCache[id];
     if (!prev) {
@@ -681,7 +714,22 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
       ),
       lastSeenAt: now()
     };
-    await chrome.storage.local.set({ [storageKey]: metaCache[id] });
+    try {
+      await chrome.storage.local.set({ [storageKey]: metaCache[id] });
+    } catch (error) {
+      if (!isQuotaError(error)) throw error;
+      const fallback = {
+        ...metaCache[id],
+        thumb: "",
+        postedText: ""
+      };
+      try {
+        await chrome.storage.local.set({ [storageKey]: fallback });
+        metaCache[id] = fallback;
+      } catch (fallbackError) {
+        console.warn("[YF] failed to store local meta cache", fallbackError);
+      }
+    }
   }
 
   async function hideVideo(id, hideTarget, cardForMeta) {
