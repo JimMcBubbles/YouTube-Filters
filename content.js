@@ -675,13 +675,26 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
 
     if (!youSection) return;
 
-    const entries = Array.from(youSection.querySelectorAll("ytd-guide-entry-renderer"));
-    const downloadsEntry = entries.find((e) => {
-        const a = e.querySelector('a[href*="/feed/downloads"], a[href$="/feed/downloads"]');
-        return !!a;
-    });
+    const downloadsAnchor =
+        youSection.querySelector('a[href*="/feed/downloads"], a[href$="/feed/downloads"]') ||
+        document.querySelector('a[href*="/feed/downloads"], a[href$="/feed/downloads"]');
+    const downloadsEntry = downloadsAnchor?.closest(
+        "ytd-guide-entry-renderer, ytd-guide-collapsible-entry-renderer, tp-yt-paper-item"
+    );
 
-    if (!downloadsEntry || !downloadsEntry.parentElement) return;
+    const insertionHost = downloadsEntry || downloadsAnchor?.parentElement;
+    if (!insertionHost || !insertionHost.parentElement) {
+        const fallbackEntry = Array.from(
+            youSection.querySelectorAll(
+                "ytd-guide-entry-renderer, ytd-guide-collapsible-entry-renderer, tp-yt-paper-item"
+            )
+        ).at(-1);
+        if (!fallbackEntry || !fallbackEntry.parentElement) return;
+        const host = buildEntryHost(fallbackEntry.className);
+        fallbackEntry.parentElement.insertBefore(host, fallbackEntry.nextSibling);
+        log("[YF] inserted custom sidebar link: Hidden (fallback)");
+        return;
+    }
 
     for (const el of existingAll) {
         if (!el.querySelector(".yf-hidden-guide-entry")) {
@@ -689,8 +702,8 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
         }
     }
 
-    const host = buildEntryHost(downloadsEntry.className);
-    downloadsEntry.parentElement.insertBefore(host, downloadsEntry.nextSibling);
+    const host = buildEntryHost(insertionHost.className);
+    insertionHost.parentElement.insertBefore(host, insertionHost.nextSibling);
     log("[YF] inserted custom sidebar link: Hidden");
 }
 
