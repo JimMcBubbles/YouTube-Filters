@@ -3,9 +3,9 @@ const SYNC_ENTRIES_KEY = "hiddenVideos";
 const LOCAL_META_KEY = "hiddenVideoMeta";
 
 const $list = document.getElementById("list");
-const $empty = document.getElementById("emptyState");
-const $sort = document.getElementById("sortSelect");
-const $refresh = document.getElementById("refreshBtn");
+const $empty = document.getElementById("empty");
+const $sort = document.getElementById("sort");
+const $clear = document.getElementById("clearAll");
 
 function byId(arr) {
   const m = new Map();
@@ -78,10 +78,10 @@ function render(entries, metaCache) {
   $list.innerHTML = "";
 
   if (!entries || entries.length === 0) {
-    $empty.classList.remove("hidden");
+    if ($empty) $empty.hidden = false;
     return;
   }
-  $empty.classList.add("hidden");
+  if ($empty) $empty.hidden = true;
 
   const sorted = sortEntries(entries, $sort.value);
 
@@ -187,8 +187,11 @@ async function unhide(id) {
   await load();
 }
 
-$sort.addEventListener("change", load);
-$refresh.addEventListener("click", load);
+$sort?.addEventListener("change", load);
+$clear?.addEventListener("click", async () => {
+  await chrome.storage.sync.set({ [SYNC_ENTRIES_KEY]: [] });
+  await load();
+});
 
 load().catch((e) => {
   console.error("Hidden page failed to load", e);
