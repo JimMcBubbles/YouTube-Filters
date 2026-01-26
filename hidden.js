@@ -7,6 +7,10 @@ const $empty = document.getElementById("empty");
 const $sort = document.getElementById("sort");
 const $clear = document.getElementById("clearAll");
 
+function metaStorageKey(id) {
+  return `${LOCAL_META_KEY}:${id}`;
+}
+
 function byId(arr) {
   const m = new Map();
   for (const x of arr) m.set(x.id, x);
@@ -62,14 +66,20 @@ function sortEntries(entries, mode) {
 }
 
 async function load() {
-  const [{ [SYNC_ENTRIES_KEY]: entriesRaw }, { [LOCAL_META_KEY]: meta }] =
-    await Promise.all([
-      chrome.storage.sync.get({ [SYNC_ENTRIES_KEY]: [] }),
-      chrome.storage.local.get({ [LOCAL_META_KEY]: {} })
-    ]);
+  const [{ [SYNC_ENTRIES_KEY]: entriesRaw }] = await Promise.all([
+    chrome.storage.sync.get({ [SYNC_ENTRIES_KEY]: [] })
+  ]);
 
   const entries = Array.isArray(entriesRaw) ? entriesRaw : [];
-  const metaCache = meta || {};
+  const metaCache = {};
+
+  if (entries.length > 0) {
+    const keys = entries.map((e) => metaStorageKey(e.id));
+    const stored = await chrome.storage.local.get(keys);
+    for (const entry of entries) {
+      metaCache[entry.id] = stored[metaStorageKey(entry.id)] || {};
+    }
+  }
 
   render(entries, metaCache);
 }
@@ -190,6 +200,13 @@ async function unhide(id) {
 $sort?.addEventListener("change", load);
 $clear?.addEventListener("click", async () => {
   await chrome.storage.sync.set({ [SYNC_ENTRIES_KEY]: [] });
+  try {
+    const stored = await chrome.storage.local.get(null);
+    const keys = Object.keys(stored).filter((key) => key.startsWith(`${LOCAL_META_KEY}:`));
+    if (keys.length > 0) await chrome.storage.local.remove(keys);
+  } catch (e) {
+    console.warn("Failed to clear local meta cache", e);
+  }
   await load();
 });
 
