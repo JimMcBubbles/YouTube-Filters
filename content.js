@@ -274,6 +274,10 @@
     return { title, channel, postedText, thumb };
   }
 
+  function metaStorageKey(id) {
+    return `${LOCAL_META_KEY}:${id}`;
+  }
+
   async function loadState() {
     // 1) Load sync entries (new format)
     const sync = await chrome.storage.sync.get({
@@ -284,9 +288,8 @@
     const entries = sync[SYNC_ENTRIES_KEY];
     const legacyIds = sync[LEGACY_IDS_KEY];
 
-    // 2) Load local meta cache
-    const local = await chrome.storage.local.get({ [LOCAL_META_KEY]: {} });
-    metaCache = local[LOCAL_META_KEY] || {};
+    // 2) Reset local meta cache (per-id storage in local).
+    metaCache = {};
 
     // 3) Migrate legacy ids if present and entries not present
     if (!Array.isArray(entries) || entries.length === 0) {
@@ -323,10 +326,6 @@
 
   async function saveEntries() {
     await chrome.storage.sync.set({ [SYNC_ENTRIES_KEY]: hiddenEntries });
-  }
-
-  async function saveMetaCache() {
-    await chrome.storage.local.set({ [LOCAL_META_KEY]: metaCache });
   }
 
   function upsertEntry(id, patch) {
@@ -665,7 +664,16 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
   async function updateMetaCache(id, card) {
     if (!id || !card) return;
     const m = extractMetaFromCard(card);
-    const prev = metaCache[id] || {};
+    const storageKey = metaStorageKey(id);
+    let prev = metaCache[id];
+    if (!prev) {
+      try {
+        const stored = await chrome.storage.local.get(storageKey);
+        prev = stored[storageKey] || {};
+      } catch {
+        prev = {};
+      }
+    }
     metaCache[id] = {
       ...prev,
       ...Object.fromEntries(
@@ -673,7 +681,7 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
       ),
       lastSeenAt: now()
     };
-    await saveMetaCache();
+    await chrome.storage.local.set({ [storageKey]: metaCache[id] });
   }
 
   async function hideVideo(id, hideTarget, cardForMeta) {
@@ -690,7 +698,11 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
 
     // Update richer local cache for display in hidden page
     if (cardForMeta) {
-      await updateMetaCache(id, cardForMeta);
+      try {
+        await updateMetaCache(id, cardForMeta);
+      } catch (e) {
+        console.warn("[YF] failed to update local meta cache", e);
+      }
     }
 
     hideIfNeeded(hideTarget, id);
