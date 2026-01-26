@@ -675,12 +675,29 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
 
     if (!youSection) return;
 
+    const normalizeLabel = (text) =>
+        (text || "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLowerCase();
+
+    const entrySelector = "ytd-guide-entry-renderer, ytd-guide-collapsible-entry-renderer, tp-yt-paper-item";
+    const entries = Array.from(youSection.querySelectorAll(entrySelector));
+
     const downloadsAnchor =
         youSection.querySelector('a[href*="/feed/downloads"], a[href$="/feed/downloads"]') ||
         document.querySelector('a[href*="/feed/downloads"], a[href$="/feed/downloads"]');
-    const downloadsEntry = downloadsAnchor?.closest(
-        "ytd-guide-entry-renderer, ytd-guide-collapsible-entry-renderer, tp-yt-paper-item"
+
+    const downloadsEntryByHref = entries.find((entry) =>
+        entry.querySelector('a[href*="/feed/downloads"], a[href$="/feed/downloads"]')
     );
+    const downloadsEntryByText = entries.find((entry) =>
+        normalizeLabel(entry.textContent).includes("downloads")
+    );
+    const downloadsEntry =
+        downloadsEntryByHref ||
+        downloadsEntryByText ||
+        downloadsAnchor?.closest(entrySelector);
 
     const insertionHost = downloadsEntry || downloadsAnchor?.parentElement;
     if (!insertionHost || !insertionHost.parentElement) {
