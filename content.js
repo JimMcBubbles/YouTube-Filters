@@ -1,6 +1,5 @@
-// 2026-01-26d - Match overlay size/opacity with Watch Later (no behavior change)
-// Version: 2026-01-26d
-// Update: 2026-01-26d - Match overlay size/opacity with Watch Later (no behavior change)
+// 2026-01-26 - Adjust overlay injection + checkmark icon (no behavior change)
+// Version: 2026-01-26c
 // Update: 2026-01-26c - Match Watch Later overlay size/colors (no behavior change)
 // Update: 2026-01-26 - Align overlay button styling with YouTube theme tokens.
 (() => {
@@ -401,27 +400,25 @@
     style.textContent = `
       .yf-overlay-button{
         all:unset;
-        width:28px;
-        height:28px;
-        padding:0;
-        border-radius:6px;
+        padding:5px;
+        border-radius:8px;
         box-sizing:border-box;
         display:grid;
         place-items:center;
         cursor:pointer;
-        background:rgba(0,0,0,0.8);
+        background:#282828;
         color:#f1f1f1;
       }
       .yf-overlay-button:hover{
-        background:rgba(0,0,0,0.9);
+        background:#4c4c4c;
       }
       .yf-overlay-button:focus-visible{
         outline:2px solid #f1f1f1;
         outline-offset:2px;
       }
       .yf-overlay-icon{
-        width:16px;
-        height:16px;
+        width:14px;
+        height:14px;
         display:block;
         stroke:currentColor;
         stroke-width:2.2;
@@ -430,14 +427,14 @@
         fill:none;
       }
       .checked .yf-overlay-icon{opacity:1}
-      .unchecked .yf-overlay-icon{opacity:.7}
+      .unchecked .yf-overlay-icon{opacity:.55}
       @media (prefers-color-scheme: light) {
         .yf-overlay-button{
-          background:rgba(0,0,0,0.08);
+          background:rgba(0,0,0,0.05);
           color:#0f0f0f;
         }
         .yf-overlay-button:hover{
-          background:rgba(0,0,0,0.14);
+          background:rgba(0,0,0,0.1);
         }
         .yf-overlay-button:focus-visible{
           outline:2px solid #0f0f0f;
