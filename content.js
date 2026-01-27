@@ -1,4 +1,6 @@
-// Version: 2026-01-26
+// 2026-01-26 - Adjust overlay injection + checkmark icon (no behavior change)
+// Version: 2026-01-26c
+// Update: 2026-01-26c - Match Watch Later overlay size/colors (no behavior change)
 // Update: 2026-01-26 - Align overlay button styling with YouTube theme tokens.
 (() => {
   "use strict";
@@ -71,7 +73,6 @@
   let metaCache = {};
 
   let scanScheduled = false;
-  let lastAnchorCount = -1;
   let lastCardCount = -1;
 
   function now() {
@@ -388,8 +389,8 @@
     const host = document.createElement("div");
     host.setAttribute(OVERLAY_ATTR, "1");
     host.style.position = "absolute";
-    host.style.top = "6px";
-    host.style.left = "6px";
+    host.style.top = "4px";
+    host.style.left = "5px";
     host.style.zIndex = "20"; // keep sane so menus win
     host.style.pointerEvents = "auto";
 
@@ -405,24 +406,40 @@
         display:grid;
         place-items:center;
         cursor:pointer;
-        background:transparent;
-        color:var(--yt-spec-overlay-text-primary, #fff);
+        background:#282828;
+        color:#f1f1f1;
       }
       .yf-overlay-button:hover{
-        background:var(--yt-spec-overlay-tonal-hover, rgba(255,255,255,0.2));
+        background:#4c4c4c;
       }
       .yf-overlay-button:focus-visible{
-        outline:2px solid var(--yt-spec-overlay-text-primary, #fff);
+        outline:2px solid #f1f1f1;
         outline-offset:2px;
       }
       .yf-overlay-icon{
         width:14px;
         height:14px;
         display:block;
+        stroke:currentColor;
+        stroke-width:2.2;
+        stroke-linecap:round;
+        stroke-linejoin:round;
+        fill:none;
       }
-      .yf-overlay-icon path{fill:currentColor}
-      .checked .yf-overlay-icon path{opacity:1}
-      .unchecked .yf-overlay-icon path{opacity:.25}
+      .checked .yf-overlay-icon{opacity:1}
+      .unchecked .yf-overlay-icon{opacity:.55}
+      @media (prefers-color-scheme: light) {
+        .yf-overlay-button{
+          background:rgba(0,0,0,0.05);
+          color:#0f0f0f;
+        }
+        .yf-overlay-button:hover{
+          background:rgba(0,0,0,0.1);
+        }
+        .yf-overlay-button:focus-visible{
+          outline:2px solid #0f0f0f;
+        }
+      }
     `;
 
     const btn = document.createElement("button");
@@ -434,7 +451,7 @@
     svg.classList.add("yf-overlay-icon");
 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", "M9 16.2l-3.5-3.5L4 14.2l5 5 12-12-1.5-1.5z");
+    path.setAttribute("d", "M5.5 12.5l4 4 9-9");
 
     svg.appendChild(path);
     btn.appendChild(svg);
@@ -812,21 +829,26 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
     const hideTarget = getHideTargetForAnyCard(anyCard);
     if (!(hideTarget instanceof HTMLElement)) return;
 
-    if (hideTarget.hasAttribute(CARD_PROCESSED_ATTR)) return;
-
     const primaryAnchor = pickPrimaryVideoAnchor(hideTarget);
     if (!primaryAnchor) {
-      hideTarget.setAttribute(CARD_PROCESSED_ATTR, "1");
+      if (!hideTarget.hasAttribute(CARD_PROCESSED_ATTR)) {
+        hideTarget.setAttribute(CARD_PROCESSED_ATTR, "1");
+      }
       return;
     }
 
     const videoId = getVideoIdFromUrl(primaryAnchor.href);
     if (!videoId) {
-      hideTarget.setAttribute(CARD_PROCESSED_ATTR, "1");
+      if (!hideTarget.hasAttribute(CARD_PROCESSED_ATTR)) {
+        hideTarget.setAttribute(CARD_PROCESSED_ATTR, "1");
+      }
       return;
     }
 
-    hideTarget.setAttribute(CARD_PROCESSED_ATTR, "1");
+    const alreadyProcessed = hideTarget.hasAttribute(CARD_PROCESSED_ATTR);
+    if (!alreadyProcessed) {
+      hideTarget.setAttribute(CARD_PROCESSED_ATTR, "1");
+    }
 
     // Apply hide (collapses slots so items shift)
     hideIfNeeded(hideTarget, videoId);
@@ -835,7 +857,12 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
     const overlayHost = pickOverlayHostFromCard(hideTarget);
     if (!(overlayHost instanceof HTMLElement)) return;
 
-    if (overlayHost.querySelector?.(`[${OVERLAY_ATTR}="1"]`)) return;
+    if (overlayHost.querySelector?.(`[${OVERLAY_ATTR}="1"]`)) {
+      if (!alreadyProcessed) {
+        updateMetaCache(videoId, hideTarget).catch(() => {});
+      }
+      return;
+    }
 
     ensurePositioningContext(overlayHost);
 
@@ -854,9 +881,11 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
 
     overlayHost.appendChild(overlay);
 
-    // Update local meta cache opportunistically (even if not hidden yet)
-    // This keeps titles/thumbs fresh for the Hidden page.
-    updateMetaCache(videoId, hideTarget).catch(() => {});
+    if (!alreadyProcessed) {
+      // Update local meta cache opportunistically (even if not hidden yet)
+      // This keeps titles/thumbs fresh for the Hidden page.
+      updateMetaCache(videoId, hideTarget).catch(() => {});
+    }
   }
 
   function scanAndDecorate() {
@@ -865,27 +894,16 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
     // Sidebar link is cheap but not always available early
     ensureSidebarHiddenLink().catch(() => {});
 
-    const anchors = querySelectorAllDeep(VIDEO_ANCHOR_SELECTOR, document)
-      .filter((a) => a instanceof HTMLAnchorElement)
-      .filter((a) => !!getVideoIdFromUrl(a.href));
+    const cards = querySelectorAllDeep(ANY_CARD_SELECTORS, document).filter(
+      (c) => c instanceof HTMLElement
+    );
 
-    if (anchors.length !== lastAnchorCount) {
-      lastAnchorCount = anchors.length;
-      console.log("[YF] video anchors (deep) seen:", anchors.length);
+    if (cards.length !== lastCardCount) {
+      lastCardCount = cards.length;
+      console.log("[YF] cards matched (deep):", cards.length);
     }
 
-    const anyCards = new Set();
-    for (const a of anchors) {
-      const anyCard = closestDeep(a, ANY_CARD_SELECTORS);
-      if (anyCard) anyCards.add(anyCard);
-    }
-
-    if (anyCards.size !== lastCardCount) {
-      lastCardCount = anyCards.size;
-      console.log("[YF] cards matched (deep):", anyCards.size);
-    }
-
-    for (const c of anyCards) processAnyCard(c);
+    for (const c of cards) processAnyCard(c);
   }
 
   function scheduleScan() {
