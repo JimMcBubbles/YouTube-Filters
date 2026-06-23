@@ -315,53 +315,63 @@
   }
 
   async function loadState() {
-    // 1) Load sync entries (new format)
-    const sync = await chrome.storage.sync.get({
-      [SYNC_ENTRIES_KEY]: null,
-      [LEGACY_IDS_KEY]: null
-    });
+    // Entries are stored in local storage (no per-item quota limit).
+    // On first run after the sync→local migration, pull from sync and move them over.
+    const local = await chrome.storage.local.get({ [SYNC_ENTRIES_KEY]: null });
+    let entries = local[SYNC_ENTRIES_KEY];
 
-    const entries = sync[SYNC_ENTRIES_KEY];
-    const legacyIds = sync[LEGACY_IDS_KEY];
-
-    // 2) Reset local meta cache (per-id storage in local).
     metaCache = {};
 
-    // 3) Migrate legacy ids if present and entries not present
     if (!Array.isArray(entries) || entries.length === 0) {
-      if (Array.isArray(legacyIds) && legacyIds.length > 0) {
-        hiddenEntries = legacyIds
-          .filter((x) => typeof x === "string" && x.length > 0)
-          .map((id) => ({
-            id,
-            hiddenAt: now(),
-            postedAtApprox: null
-          }));
+      // Nothing in local yet — check sync for existing data to migrate.
+      const sync = await chrome.storage.sync.get({
+        [SYNC_ENTRIES_KEY]: null,
+        [LEGACY_IDS_KEY]: null
+      });
+      const syncEntries = sync[SYNC_ENTRIES_KEY];
+      const legacyIds  = sync[LEGACY_IDS_KEY];
 
-        await chrome.storage.sync.set({ [SYNC_ENTRIES_KEY]: hiddenEntries });
-        // keep legacy key around or remove it; removing is cleaner
-        await chrome.storage.sync.remove(LEGACY_IDS_KEY);
+      if (Array.isArray(syncEntries) && syncEntries.length > 0) {
+        entries = syncEntries;
+        try {
+          await chrome.storage.local.set({ [SYNC_ENTRIES_KEY]: entries });
+          await chrome.storage.sync.remove([SYNC_ENTRIES_KEY, LEGACY_IDS_KEY]);
+          console.log("[YF] migrated", entries.length, "entries from sync → local storage");
+        } catch (e) {
+          console.warn("[YF] migration to local storage failed", e);
+        }
+      } else if (Array.isArray(legacyIds) && legacyIds.length > 0) {
+        entries = legacyIds
+          .filter((x) => typeof x === "string" && x.length > 0)
+          .map((id) => ({ id, hiddenAt: now(), postedAtApprox: null }));
+        try {
+          await chrome.storage.local.set({ [SYNC_ENTRIES_KEY]: entries });
+          await chrome.storage.sync.remove([SYNC_ENTRIES_KEY, LEGACY_IDS_KEY]);
+        } catch (e) {
+          console.warn("[YF] legacy migration failed", e);
+        }
       } else {
-        hiddenEntries = [];
+        entries = [];
       }
-    } else {
-      hiddenEntries = entries
-        .filter((e) => e && typeof e.id === "string")
-        .map((e) => ({
-          id: e.id,
-          hiddenAt: Number.isFinite(e.hiddenAt) ? e.hiddenAt : now(),
-          postedAtApprox:
-            e.postedAtApprox === null || Number.isFinite(e.postedAtApprox)
-              ? e.postedAtApprox
-              : null
-        }));
     }
 
+    hiddenEntries = entries
+      .filter((e) => e && typeof e.id === "string")
+      .map((e) => ({
+        id: e.id,
+        hiddenAt: Number.isFinite(e.hiddenAt) ? e.hiddenAt : now(),
+        postedAtApprox:
+          e.postedAtApprox === null || Number.isFinite(e.postedAtApprox)
+            ? e.postedAtApprox
+            : null
+      }));
+
     hiddenIds = new Set(hiddenEntries.map((e) => e.id));
+    console.log("[YF] loaded", hiddenIds.size, "hidden entries");
   }
 
   async function saveEntries() {
-    await chrome.storage.sync.set({ [SYNC_ENTRIES_KEY]: hiddenEntries });
+    await chrome.storage.local.set({ [SYNC_ENTRIES_KEY]: hiddenEntries });
   }
 
   function upsertEntry(id, patch) {
@@ -469,7 +479,7 @@
       (e) => {
         e.preventDefault();
         e.stopPropagation();
-        onToggle(setCheckedUI);
+        onToggle(setCheckedUI).catch((err) => console.error("[YF] toggle failed", err));
       },
       true
     );
@@ -792,7 +802,6 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
   }
 
   async function hideVideo(id, hideTarget, cardForMeta) {
-    // postedAtApprox: parse from "x ago" if available
     const m = cardForMeta ? extractMetaFromCard(cardForMeta) : { postedText: "" };
     const postedAtApprox = m.postedText ? parsePostedAtApprox(m.postedText) : null;
 
@@ -801,9 +810,15 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
       postedAtApprox
     });
 
-    await saveEntries();
+    // Hide immediately before async storage writes so the card vanishes on click.
+    hideIfNeeded(hideTarget, id);
 
-    // Update richer local cache for display in hidden page
+    try {
+      await saveEntries();
+    } catch (e) {
+      console.error("[YF] failed to save hidden entries", e);
+    }
+
     if (cardForMeta) {
       try {
         await updateMetaCache(id, cardForMeta);
@@ -811,16 +826,19 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
         console.warn("[YF] failed to update local meta cache", e);
       }
     }
-
-    hideIfNeeded(hideTarget, id);
   }
 
   async function unhideVideo(id, hideTarget) {
     removeEntry(id);
-    await saveEntries();
 
-    // keep local meta unless you want to delete it too; I'll keep it
+    // Show immediately before async storage write.
     hideIfNeeded(hideTarget, id);
+
+    try {
+      await saveEntries();
+    } catch (e) {
+      console.error("[YF] failed to save hidden entries", e);
+    }
   }
 
   function processAnyCard(anyCard) {
@@ -923,7 +941,7 @@ html:not([dark]) .yf-hidden-guide-entry:hover {
     window.addEventListener("popstate", scheduleScan);
 
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "sync") return;
+      if (areaName !== "local") return;
 
       if (changes[SYNC_ENTRIES_KEY]) {
         const next = changes[SYNC_ENTRIES_KEY].newValue;
